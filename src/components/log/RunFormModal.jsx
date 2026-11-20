@@ -83,7 +83,9 @@ export function RunFormModal({ isOpen, onClose, initialDurationSec = 0, onSave }
 
             {/* Tanggal */}
             <div className="space-y-1.5">
-              <Label htmlFor="date" className="text-xs">Tanggal Lari</Label>
+              <Label htmlFor="date" className="text-xs">
+                Tanggal Lari
+              </Label>
               <Input
                 id="date"
                 type="date"
@@ -97,7 +99,9 @@ export function RunFormModal({ isOpen, onClose, initialDurationSec = 0, onSave }
             {/* Jarak */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <Label htmlFor="distance" className="text-xs">Jarak (KM)</Label>
+                <Label htmlFor="distance" className="text-xs">
+                  Jarak (KM)
+                </Label>
                 <button
                   type="button"
                   onClick={() => setDistanceKm('3.4')}
@@ -114,6 +118,7 @@ export function RunFormModal({ isOpen, onClose, initialDurationSec = 0, onSave }
                 min="0.1"
                 placeholder="misal 3.4"
                 value={distanceKm}
+                onFocus={(e) => e.target.select()}
                 onChange={(e) => setDistanceKm(e.target.value)}
                 required
                 className="h-10 text-sm font-semibold"
@@ -129,6 +134,7 @@ export function RunFormModal({ isOpen, onClose, initialDurationSec = 0, onSave }
                   min="0"
                   placeholder="Menit"
                   value={durationMin}
+                  onFocus={(e) => e.target.select()}
                   onChange={(e) => setDurationMin(e.target.value)}
                   className="h-10 text-sm font-semibold"
                 />
@@ -138,6 +144,7 @@ export function RunFormModal({ isOpen, onClose, initialDurationSec = 0, onSave }
                   max="59"
                   placeholder="Detik"
                   value={durationSec}
+                  onFocus={(e) => e.target.select()}
                   onChange={(e) => setDurationSec(e.target.value)}
                   className="h-10 text-sm font-semibold"
                 />
@@ -159,9 +166,7 @@ export function RunFormModal({ isOpen, onClose, initialDurationSec = 0, onSave }
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-xs">Tingkat Capek (1 - 10)</Label>
-                <span className="text-xs font-bold text-primary">
-                  Skala {effort} / 10
-                </span>
+                <span className="text-xs font-bold text-primary">Skala {effort} / 10</span>
               </div>
               <div className="flex justify-between gap-1">
                 {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
@@ -186,7 +191,9 @@ export function RunFormModal({ isOpen, onClose, initialDurationSec = 0, onSave }
 
             {/* Catatan Singkat */}
             <div className="space-y-1.5">
-              <Label htmlFor="note" className="text-xs">Catatan Singkat (Opsional)</Label>
+              <Label htmlFor="note" className="text-xs">
+                Catatan Singkat (Opsional)
+              </Label>
               <Input
                 id="note"
                 placeholder="misal: Lutut agak pegal, nafas stabil..."

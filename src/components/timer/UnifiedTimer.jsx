@@ -12,6 +12,8 @@ import {
   Repeat,
   Check,
   Award,
+  Minus,
+  Plus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -23,15 +25,29 @@ import { formatDuration } from '@/lib/format';
 export function UnifiedTimer({ onFinish, onStatusChange }) {
   // --- 1. PENGATURAN SESI (Konfigurasi sebelum lari) ---
   const [targetType, setTargetType] = useState('none'); // 'none' | '20' | '30' | 'custom'
-  const [customTargetMin, setCustomTargetMin] = useState(25);
+  const [customTargetInput, setCustomTargetInput] = useState('25');
 
   const [useInterval, setUseInterval] = useState(true);
-  const [runMinutes, setRunMinutes] = useState(1);
-  const [walkMinutes, setWalkMinutes] = useState(2);
+  const [runMinutesInput, setRunMinutesInput] = useState('1');
+  const [walkMinutesInput, setWalkMinutesInput] = useState('2');
 
-  // Putaran: Auto vs Kustom (Poin 2)
+  // Putaran: Auto vs Kustom
   const [isAutoRounds, setIsAutoRounds] = useState(true);
-  const [customRounds, setCustomRounds] = useState(8);
+  const [customRoundsInput, setCustomRoundsInput] = useState('8');
+
+  // Nilai numerik aman untuk kalkulasi timer
+  const runMinutes = Math.max(0.5, parseFloat(runMinutesInput) || 1);
+  const walkMinutes = Math.max(0.5, parseFloat(walkMinutesInput) || 2);
+  const customTargetMin = Math.max(1, parseInt(customTargetInput, 10) || 25);
+  const customRounds = Math.max(1, parseInt(customRoundsInput, 10) || 8);
+
+  // Helper untuk stepper (+ dan -) yang ramah sentuhan di HP
+  const adjustNumber = (setter, currentStr, delta, min, max, isFloat = false) => {
+    const val = isFloat ? parseFloat(currentStr) || min : parseInt(currentStr, 10) || min;
+    const next = isFloat ? Math.round((val + delta) * 10) / 10 : val + delta;
+    const clamped = Math.max(min, Math.min(max, next));
+    setter(String(clamped));
+  };
 
   // Perhitungan target durasi dalam detik (jika ada)
   const targetTotalSec =
@@ -40,10 +56,10 @@ export function UnifiedTimer({ onFinish, onStatusChange }) {
       : targetType === '30'
         ? 30 * 60
         : targetType === 'custom'
-          ? Math.max(1, customTargetMin) * 60
+          ? customTargetMin * 60
           : null;
 
-  // Perhitungan putaran otomatis (Poin 2)
+  // Perhitungan putaran otomatis
   const roundCycleSec = (runMinutes + walkMinutes) * 60;
   const effectiveRounds = isAutoRounds
     ? targetTotalSec
@@ -60,11 +76,11 @@ export function UnifiedTimer({ onFinish, onStatusChange }) {
   const [currentPhase, setCurrentPhase] = useState('run'); // 'run' | 'walk'
   const [phaseRemainingSec, setPhaseRemainingSec] = useState(60);
 
-  // Notifikasi status (Poin 3 & 4: Tetap jalan, hanya beri tahu saat tercapai)
+  // Notifikasi status
   const [targetReached, setTargetReached] = useState(false);
   const [roundsCompleted, setRoundsCompleted] = useState(false);
 
-  // --- REFS UNTUK PREVENT RESET & TIMER PRESISI (Poin 1) ---
+  // --- REFS UNTUK PREVENT RESET & TIMER PRESISI ---
   const startTimeRef = useRef(0);
   const totalElapsedSecRef = useRef(0);
   const pausedElapsedSecRef = useRef(0);
@@ -106,10 +122,9 @@ export function UnifiedTimer({ onFinish, onStatusChange }) {
         osc.start();
         osc.stop(ctx.currentTime + 0.35);
       } else if (type === 'targetReached' || type === 'roundsDone') {
-        // Melodi perayaan: do-mi-sol
-        osc.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
-        osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.15); // E5
-        osc.frequency.setValueAtTime(783.99, ctx.currentTime + 0.3); // G5
+        osc.frequency.setValueAtTime(523.25, ctx.currentTime);
+        osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.15);
+        osc.frequency.setValueAtTime(783.99, ctx.currentTime + 0.3);
         gain.gain.setValueAtTime(0.35, ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.7);
         osc.start();
@@ -154,7 +169,7 @@ export function UnifiedTimer({ onFinish, onStatusChange }) {
     }
   };
 
-  // --- 3. MAIN TIMER ENGINE (Hanya re-run saat status berubah) ---
+  // --- 3. MAIN TIMER ENGINE ---
   useEffect(() => {
     if (status === 'running') {
       requestWakeLock();
@@ -162,12 +177,12 @@ export function UnifiedTimer({ onFinish, onStatusChange }) {
       timerLoopRef.current = setInterval(() => {
         const now = Date.now();
 
-        // 1. Total Elapsed Time (Dihitung dari startTimeRef murni, TIDAK PERNAH KE-RESET saat fase ganti)
+        // 1. Total Elapsed Time
         const elapsed = Math.floor((now - startTimeRef.current) / 1000);
         totalElapsedSecRef.current = elapsed;
         setTotalElapsedSec(elapsed);
 
-        // 2. Cek Notifikasi Target Waktu (Poin 3: Beri tahu tapi JANGAN STOP!)
+        // 2. Cek Notifikasi Target Waktu
         if (targetTotalSec && elapsed >= targetTotalSec && !targetReachedRef.current) {
           targetReachedRef.current = true;
           setTargetReached(true);
@@ -209,7 +224,7 @@ export function UnifiedTimer({ onFinish, onStatusChange }) {
               currentRoundRef.current = nextRound;
               setCurrentRound(nextRound);
 
-              // Cek Notifikasi Putaran Selesai (Poin 4: Beri tahu tapi JANGAN STOP!)
+              // Cek Notifikasi Putaran Selesai
               if (nextRound > effectiveRounds && !roundsCompletedRef.current) {
                 roundsCompletedRef.current = true;
                 setRoundsCompleted(true);
@@ -295,7 +310,6 @@ export function UnifiedTimer({ onFinish, onStatusChange }) {
   const handleResume = () => {
     const now = Date.now();
 
-    // Pulihkan waktu mulai dari akumulasi jeda
     startTimeRef.current = now - pausedElapsedSecRef.current * 1000;
     phaseStartTimeRef.current = now - pausedPhaseElapsedSecRef.current * 1000;
 
@@ -406,20 +420,70 @@ export function UnifiedTimer({ onFinish, onStatusChange }) {
                 </Button>
               </div>
 
+              {/* Input Target Kustom dengan Stepper Touch-Friendly */}
               {targetType === 'custom' && (
-                <div className="pt-1 flex items-center gap-2">
-                  <Input
-                    type="number"
-                    min="1"
-                    max="180"
-                    placeholder="Menit target..."
-                    value={customTargetMin}
-                    onChange={(e) =>
-                      setCustomTargetMin(Math.max(1, parseInt(e.target.value, 10) || 1))
-                    }
-                    className="h-9 text-sm font-semibold"
-                  />
-                  <span className="text-xs text-muted-foreground shrink-0">menit target</span>
+                <div className="pt-2 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        adjustNumber(setCustomTargetInput, customTargetInput, -5, 1, 180)
+                      }
+                      className="h-10 w-10 shrink-0 rounded-xl bg-muted hover:bg-muted/80 active:scale-95 flex items-center justify-center font-bold text-foreground border border-border"
+                      title="Kurangi 5 menit"
+                    >
+                      <Minus className="h-4 w-4" />
+                    </button>
+                    <div className="relative flex-1">
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={customTargetInput}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) =>
+                          setCustomTargetInput(e.target.value.replace(/[^0-9]/g, ''))
+                        }
+                        onBlur={() => {
+                          if (!customTargetInput || parseInt(customTargetInput, 10) < 1) {
+                            setCustomTargetInput('25');
+                          }
+                        }}
+                        className="h-10 text-center font-bold text-base"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
+                        menit
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        adjustNumber(setCustomTargetInput, customTargetInput, 5, 1, 180)
+                      }
+                      className="h-10 w-10 shrink-0 rounded-xl bg-muted hover:bg-muted/80 active:scale-95 flex items-center justify-center font-bold text-foreground border border-border"
+                      title="Tambah 5 menit"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  {/* Preset Pilihan Cepat Kustom */}
+                  <div className="flex items-center gap-1.5 justify-center">
+                    {[15, 25, 40, 50, 60].map((mins) => (
+                      <button
+                        key={mins}
+                        type="button"
+                        onClick={() => setCustomTargetInput(String(mins))}
+                        className={`px-2.5 py-1 rounded-md text-[11px] font-semibold border transition-colors ${
+                          customTargetInput === String(mins)
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-muted/50 border-border text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        {mins}m
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -449,38 +513,133 @@ export function UnifiedTimer({ onFinish, onStatusChange }) {
               </div>
 
               {useInterval ? (
-                <div className="space-y-3 pt-1">
-                  {/* Durasi Lari & Jalan */}
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <div>
-                      <Label className="text-[11px] text-muted-foreground">Lari (Menit)</Label>
-                      <Input
-                        type="number"
-                        min="0.5"
-                        step="0.5"
-                        value={runMinutes}
-                        onChange={(e) =>
-                          setRunMinutes(Math.max(0.5, parseFloat(e.target.value) || 1))
-                        }
-                        className="mt-1 h-9 text-center font-bold text-sm"
-                      />
+                <div className="space-y-3.5 pt-1">
+                  {/* Durasi Lari & Jalan dengan Stepper Touch-Friendly */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Durasi Lari */}
+                    <div className="space-y-1.5">
+                      <Label className="text-[11px] font-medium text-muted-foreground">
+                        Lari (Menit)
+                      </Label>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            adjustNumber(setRunMinutesInput, runMinutesInput, -0.5, 0.5, 60, true)
+                          }
+                          className="h-10 w-9 shrink-0 rounded-lg bg-muted hover:bg-muted/80 active:scale-95 flex items-center justify-center font-bold text-foreground border border-border"
+                          title="Kurangi 0.5m"
+                        >
+                          <Minus className="h-3.5 w-3.5" />
+                        </button>
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          value={runMinutesInput}
+                          onFocus={(e) => e.target.select()}
+                          onChange={(e) =>
+                            setRunMinutesInput(e.target.value.replace(/[^0-9.]/g, ''))
+                          }
+                          onBlur={() => {
+                            if (!runMinutesInput || parseFloat(runMinutesInput) < 0.5) {
+                              setRunMinutesInput('1');
+                            }
+                          }}
+                          className="h-10 text-center font-bold text-base"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            adjustNumber(setRunMinutesInput, runMinutesInput, 0.5, 0.5, 60, true)
+                          }
+                          className="h-10 w-9 shrink-0 rounded-lg bg-muted hover:bg-muted/80 active:scale-95 flex items-center justify-center font-bold text-foreground border border-border"
+                          title="Tambah 0.5m"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      {/* Quick Chips Lari */}
+                      <div className="flex items-center justify-between gap-1 pt-0.5">
+                        {[1, 1.5, 2, 3].map((val) => (
+                          <button
+                            key={val}
+                            type="button"
+                            onClick={() => setRunMinutesInput(String(val))}
+                            className={`flex-1 py-0.5 rounded text-[10px] font-semibold border transition-all ${
+                              parseFloat(runMinutesInput) === val
+                                ? 'bg-primary/10 text-primary border-primary/30 font-bold'
+                                : 'bg-muted/30 border-border/50 text-muted-foreground'
+                            }`}
+                          >
+                            {val}m
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                    <div>
-                      <Label className="text-[11px] text-muted-foreground">Jalan (Menit)</Label>
-                      <Input
-                        type="number"
-                        min="0.5"
-                        step="0.5"
-                        value={walkMinutes}
-                        onChange={(e) =>
-                          setWalkMinutes(Math.max(0.5, parseFloat(e.target.value) || 1))
-                        }
-                        className="mt-1 h-9 text-center font-bold text-sm"
-                      />
+
+                    {/* Durasi Jalan */}
+                    <div className="space-y-1.5">
+                      <Label className="text-[11px] font-medium text-muted-foreground">
+                        Jalan (Menit)
+                      </Label>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            adjustNumber(setWalkMinutesInput, walkMinutesInput, -0.5, 0.5, 60, true)
+                          }
+                          className="h-10 w-9 shrink-0 rounded-lg bg-muted hover:bg-muted/80 active:scale-95 flex items-center justify-center font-bold text-foreground border border-border"
+                          title="Kurangi 0.5m"
+                        >
+                          <Minus className="h-3.5 w-3.5" />
+                        </button>
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          value={walkMinutesInput}
+                          onFocus={(e) => e.target.select()}
+                          onChange={(e) =>
+                            setWalkMinutesInput(e.target.value.replace(/[^0-9.]/g, ''))
+                          }
+                          onBlur={() => {
+                            if (!walkMinutesInput || parseFloat(walkMinutesInput) < 0.5) {
+                              setWalkMinutesInput('2');
+                            }
+                          }}
+                          className="h-10 text-center font-bold text-base"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            adjustNumber(setWalkMinutesInput, walkMinutesInput, 0.5, 0.5, 60, true)
+                          }
+                          className="h-10 w-9 shrink-0 rounded-lg bg-muted hover:bg-muted/80 active:scale-95 flex items-center justify-center font-bold text-foreground border border-border"
+                          title="Tambah 0.5m"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      {/* Quick Chips Jalan */}
+                      <div className="flex items-center justify-between gap-1 pt-0.5">
+                        {[1, 2, 2.5, 3].map((val) => (
+                          <button
+                            key={val}
+                            type="button"
+                            onClick={() => setWalkMinutesInput(String(val))}
+                            className={`flex-1 py-0.5 rounded text-[10px] font-semibold border transition-all ${
+                              parseFloat(walkMinutesInput) === val
+                                ? 'bg-primary/10 text-primary border-primary/30 font-bold'
+                                : 'bg-muted/30 border-border/50 text-muted-foreground'
+                            }`}
+                          >
+                            {val}m
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
-                  {/* Pengaturan Putaran: Auto vs Kustom (Poin 2) */}
+                  {/* Pengaturan Putaran: Auto vs Kustom */}
                   <div className="rounded-lg bg-muted/40 p-2.5 border border-border/60 space-y-2">
                     <div className="flex items-center justify-between">
                       <Label className="text-[11px] font-semibold text-foreground">
@@ -519,20 +678,44 @@ export function UnifiedTimer({ onFinish, onStatusChange }) {
                           : `Sesi bebas default ${effectiveRounds} putaran (timer tetap berlanjut jika selesai).`}
                       </p>
                     ) : (
-                      <div className="flex items-center gap-2 pt-0.5">
-                        <Input
-                          type="number"
-                          min="1"
-                          max="50"
-                          value={customRounds}
-                          onChange={(e) =>
-                            setCustomRounds(Math.max(1, parseInt(e.target.value, 10) || 1))
-                          }
-                          className="h-8 text-center font-bold text-xs"
-                        />
-                        <span className="text-xs text-muted-foreground shrink-0">
-                          putaran target
-                        </span>
+                      <div className="flex items-center justify-between gap-2 pt-1">
+                        <span className="text-xs text-muted-foreground">Target Putaran:</span>
+                        <div className="flex items-center gap-1 w-36">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              adjustNumber(setCustomRoundsInput, customRoundsInput, -1, 1, 50)
+                            }
+                            className="h-8 w-8 rounded-md bg-muted hover:bg-muted/80 active:scale-95 flex items-center justify-center font-bold text-foreground border border-border shrink-0"
+                          >
+                            <Minus className="h-3 w-3" />
+                          </button>
+                          <Input
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            value={customRoundsInput}
+                            onFocus={(e) => e.target.select()}
+                            onChange={(e) =>
+                              setCustomRoundsInput(e.target.value.replace(/[^0-9]/g, ''))
+                            }
+                            onBlur={() => {
+                              if (!customRoundsInput || parseInt(customRoundsInput, 10) < 1) {
+                                setCustomRoundsInput('8');
+                              }
+                            }}
+                            className="h-8 text-center font-bold text-xs flex-1"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              adjustNumber(setCustomRoundsInput, customRoundsInput, 1, 1, 50)
+                            }
+                            className="h-8 w-8 rounded-md bg-muted hover:bg-muted/80 active:scale-95 flex items-center justify-center font-bold text-foreground border border-border shrink-0"
+                          >
+                            <Plus className="h-3 w-3" />
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -567,7 +750,7 @@ export function UnifiedTimer({ onFinish, onStatusChange }) {
       {/* ============================================================== */}
       {(status === 'running' || status === 'paused') && (
         <div className="space-y-4 animate-in fade-in duration-200">
-          {/* Banner Notifikasi Target Waktu Tercapai (Poin 3: Timer TETAP JALAN) */}
+          {/* Banner Notifikasi Target Waktu Tercapai */}
           {targetReached && (
             <div className="rounded-xl bg-emerald-500/15 border border-emerald-500/40 p-3 text-center text-xs font-semibold text-emerald-700 dark:text-emerald-300 flex items-center justify-center gap-2 shadow-xs animate-in zoom-in-95">
               <Check className="h-4 w-4 shrink-0 text-emerald-500 stroke-[3]" />
@@ -575,7 +758,7 @@ export function UnifiedTimer({ onFinish, onStatusChange }) {
             </div>
           )}
 
-          {/* Banner Notifikasi Target Putaran Tercapai (Poin 4: Timer TETAP JALAN) */}
+          {/* Banner Notifikasi Target Putaran Tercapai */}
           {roundsCompleted && (
             <div className="rounded-xl bg-amber-500/15 border border-amber-500/40 p-3 text-center text-xs font-semibold text-amber-800 dark:text-amber-300 flex items-center justify-center gap-2 shadow-xs animate-in zoom-in-95">
               <Award className="h-4 w-4 shrink-0 text-amber-500" />
@@ -583,7 +766,7 @@ export function UnifiedTimer({ onFinish, onStatusChange }) {
             </div>
           )}
 
-          {/* Card Utama: Fase Interval (Jika Aktif) */}
+          {/* Card Utama: Fase Interval */}
           {useInterval && (
             <Card
               className={`border-2 transition-all duration-300 shadow-md ${
@@ -633,7 +816,7 @@ export function UnifiedTimer({ onFinish, onStatusChange }) {
             </Card>
           )}
 
-          {/* Card Total Durasi & Target (Stopwatch murni yang TIDAK PERNAH KE-RESET saat fase ganti) */}
+          {/* Card Total Durasi & Target */}
           <Card className="border-border/80 shadow-xs bg-card">
             <CardContent className="p-5 space-y-3">
               <div className="flex items-center justify-between">
